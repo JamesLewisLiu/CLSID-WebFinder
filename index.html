@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Find CLSIDs in CLVSD.ax locally in your browser. Supports PE32 / PE32+ AX and DLL files up to 4 MiB, without uploads or registration.">
+  <title>CLSID WebFinder · CLVSD.ax</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101416;
+      --panel: #171d20;
+      --panel-2: #1d2529;
+      --line: #344047;
+      --text: #edf3f2;
+      --muted: #9eaeaf;
+      --accent: #69d3b4;
+      --accent-strong: #9af0d4;
+      --warn: #f0bd68;
+      --danger: #ee887e;
+      --mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .shell { width: min(1100px, calc(100% - 40px)); margin: 0 auto; padding: 52px 0 64px; }
+    header { display: flex; justify-content: space-between; gap: 28px; align-items: flex-end; margin-bottom: 36px; }
+    .eyebrow { color: var(--accent); font: 700 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 15px; }
+    h1 { margin: 0; max-width: 670px; font-size: clamp(30px, 5vw, 52px); line-height: 1.08; letter-spacing: 0; }
+    .lede { max-width: 580px; color: var(--muted); font-size: 16px; line-height: 1.7; margin: 16px 0 0; }
+    .mark { width: 66px; height: 66px; border: 1px solid var(--line); display: grid; place-items: center; color: var(--accent-strong); font: 800 20px var(--mono); flex: 0 0 auto; }
+    .panel { border: 1px solid var(--line); background: var(--panel); }
+    .drop-panel { padding: 22px; }
+    .dropzone { min-height: 174px; display: grid; place-items: center; border: 1px dashed #587069; background: #141b1d; text-align: center; padding: 24px; transition: border-color .15s, background .15s; }
+    .dropzone.dragging, .dropzone:hover { border-color: var(--accent); background: #172723; }
+    .file-button:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 5px; }
+    [hidden] { display: none !important; }
+    .dropzone input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .drop-title { font-size: 18px; font-weight: 700; }
+    .drop-subtitle { color: var(--muted); margin: 9px 0 17px; }
+    .file-button, .copy-button, .export-button { border: 1px solid var(--accent); background: var(--accent); color: #10211d; font: 700 14px "Segoe UI", "Microsoft YaHei", sans-serif; padding: 10px 15px; cursor: pointer; }
+    .file-button:hover, .copy-button:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+    .hint { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 13px; }
+    .results { display: none; margin-top: 24px; }
+    .results.visible { display: block; }
+    .status-line { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 15px; }
+    .status { color: var(--muted); font-size: 14px; }
+    .status strong { color: var(--text); }
+    .status.error { color: var(--danger); }
+    .grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 16px; }
+    .primary { padding: 25px; min-height: 252px; }
+    .label { color: var(--muted); font: 700 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .primary h2 { margin: 13px 0 12px; font: 700 clamp(20px, 2.3vw, 27px)/1.3 var(--mono); color: var(--accent-strong); overflow-wrap: anywhere; }
+    .primary .explanation { max-width: 620px; color: var(--muted); line-height: 1.65; margin: 0; }
+    .primary-actions { margin-top: 21px; display: flex; align-items: center; gap: 13px; flex-wrap: wrap; }
+    .copy-button { display: none; }
+    .copy-button.visible { display: inline-block; }
+    .copy-state { color: var(--accent); font-size: 13px; }
+    .meta { padding: 25px; }
+    .meta dl { display: grid; grid-template-columns: 110px 1fr; gap: 14px 16px; margin: 15px 0 0; font-size: 13px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+    .section { margin-top: 16px; padding: 22px 25px; }
+    .section-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+    .section-title h3 { margin: 0; font-size: 17px; }
+    .section-title span { color: var(--muted); font-size: 12px; }
+    .candidate-list { display: grid; gap: 9px; }
+    .candidate { display: grid; grid-template-columns: minmax(210px, 1.2fr) minmax(110px, .8fr) auto; gap: 16px; align-items: center; border-top: 1px solid var(--line); padding: 13px 0; }
+    .candidate:first-child { border-top: 0; padding-top: 0; }
+    .candidate:last-child { padding-bottom: 0; }
+    .candidate-code { font: 14px var(--mono); overflow-wrap: anywhere; }
+    .candidate-kind { color: var(--muted); font-size: 13px; }
+    .badge { justify-self: end; padding: 5px 8px; border: 1px solid #527b6d; color: var(--accent-strong); font: 11px var(--mono); white-space: nowrap; }
+    .badge.neutral { border-color: var(--line); color: var(--muted); }
+    .note { color: var(--muted); line-height: 1.65; font-size: 13px; margin: 0; }
+    .note code, code { font-family: var(--mono); color: var(--text); }
+    footer { color: #778487; font-size: 12px; line-height: 1.65; margin-top: 27px; }
+    .empty { color: var(--muted); }
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 24px, 620px); padding-top: 32px; }
+      header { align-items: flex-start; }
+      .mark { width: 50px; height: 50px; font-size: 15px; }
+      .grid { grid-template-columns: 1fr; }
+      .candidate { grid-template-columns: 1fr; gap: 6px; }
+      .badge { justify-self: start; }
+      .hint { display: block; }
+      .hint span + span { display: block; margin-top: 5px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="eyebrow">CLSID WebFinder / Local analysis</div>
+        <h1>Find the CLSID in CLVSD.ax</h1>
+        <p class="lede">Drop in an ActiveX or DirectShow binary to inspect its COM class IDs. Analysis runs entirely in your browser. Your file stays on your device.</p>
+      </div>
+      <div class="mark" aria-hidden="true">AX</div>
+    </header>
+
+    <section class="panel drop-panel" aria-label="Choose a file">
+      <div class="dropzone" id="dropzone">
+        <div>
+          <div class="drop-title">Drop CLVSD.ax here</div>
+          <div class="drop-subtitle">or choose a local file to start scanning</div>
+          <label class="file-button" for="file-input" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('file-input').click()}">Choose AX file</label>
+          <input id="file-input" type="file">
+        </div>
+      </div>
+      <div class="hint"><span>PE32 / PE32+ · Up to 4 MiB (4,194,304 bytes).</span><span>Larger files are rejected before reading.</span></div>
+    </section>
+
+    <section class="results" id="results" aria-live="polite">
+      <div class="status-line"><div class="status" id="status">Analyzing…</div><div class="status" id="file-name"></div></div>
+      <div class="grid">
+        <article class="panel primary">
+          <div class="label" id="result-kind">Primary match</div>
+          <h2 id="primary-clsid">Waiting for a file</h2>
+          <p class="explanation" id="primary-explanation">Choose a file to see its most likely CLVSD decoder class ID.</p>
+          <div class="primary-actions"><button class="copy-button" id="copy-button" type="button">Copy CLSID</button><button class="export-button" id="export-button" type="button" hidden>Export JSON</button><span class="copy-state" id="copy-state"></span></div>
+        </article>
+        <article class="panel meta">
+          <div class="label">PE identity</div>
+          <dl>
+            <dt>Format</dt><dd id="pe-format">-</dd>
+            <dt>Architecture</dt><dd id="pe-arch">-</dd>
+            <dt>File size</dt><dd id="pe-size">-</dd>
+            <dt>SHA-256</dt><dd id="pe-sha">-</dd>
+            <dt>Exports</dt><dd id="pe-exports">-</dd>
+          </dl>
+        </article>
+      </div>
+
+      <article class="panel section">
+        <div class="section-title"><h3>Class-factory CLSID candidates</h3><span id="candidate-count">0 items</span></div>
+        <div class="candidate-list" id="candidate-list"><div class="empty">No results yet.</div></div>
+      </article>
+      <article class="panel section">
+        <div class="section-title"><h3>How identification works</h3></div>
+        <p class="note">The primary match comes from DirectShow <code>CFactoryTemplate</code> structures: class names, CLSID pointers, creation functions, initialization functions, and optional filter setup. Decoder and property-page classes are listed separately. Structural matches in unknown files remain candidates; GUIDs found only as bytes or text are clues. The page does not execute <code>DllGetClassObject</code> or verify runtime activation or video playback.</p>
+        <details id="clue-details" style="margin-top:16px"><summary>Other GUID clues · <span id="clue-count">0 items</span></summary><div class="candidate-list" id="clue-list" style="margin-top:16px"></div></details>
+      </article>
+    </section>
+
+    <footer>Local browser analysis · The first three GUID fields use Windows COM little-endian layout · Offsets are hexadecimal file offsets.</footer>
+  </main>
+
+  <script src="scanner.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

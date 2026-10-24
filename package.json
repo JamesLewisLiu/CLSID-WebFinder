@@ -1,0 +1,12 @@
+{
+  "name": "clsid-webfinder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local browser inspection of CLSIDs in CLVSD.ax and DirectShow binaries up to 4 MiB",
+  "license": "Unlicense",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --check scanner.js && node --check app.js && node test-scanner.cjs && node test-app.cjs",
+    "build": "node scripts/build.cjs"
+  }
+}
